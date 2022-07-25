@@ -1,55 +1,132 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PS4GamingApplication.Models;
+
 
 namespace PS4GamingApplication.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
     public class AdminController : Controller
     {
-        private readonly ApplicationDbContext _applicationDbContext;
-        public AdminController(ApplicationDbContext applicationDbContext)
+        private readonly IConfiguration _configuration;
+        private readonly ApplicationDbContext _context;
+
+        public AdminController(IConfiguration configuration, ApplicationDbContext context)
         {
-            _applicationDbContext = applicationDbContext;
-        }
-        [HttpGet("ListOfGameDetails")]
-       
-        public async Task<IActionResult> GetAsync()
-        {
-            var games = await _applicationDbContext.games.ToListAsync();
-            return Ok(games);
+            _context = context;
+            _configuration = configuration;
         }
 
-        [HttpPost("AddGame")]
-        
-        public async Task<IActionResult> PostAsync(Game games)
+        [HttpGet]
+        [Route("UsersList"), Authorize(Roles = "Admin")]
+        public ActionResult GetUsers()
         {
-            _applicationDbContext.games.Add(games);
-            await _applicationDbContext.SaveChangesAsync();
-            return Created($"/get-games-by-id?id={games.Id}", games);
-        }
-        [HttpPut("UpdateGame")]
-        public async Task<IActionResult> PutAsync(Game gameToUpdate)
-        {
-            _applicationDbContext.games.Update(gameToUpdate);
-            await _applicationDbContext.SaveChangesAsync();
-            return NoContent();
-        }
-        [Route("{id}")]
-        [HttpDelete("DeleteGame")]
-        public async Task<IActionResult> DeleteAsync(int id)
-        {
-            var gameToDelete = await _applicationDbContext.games.FindAsync(id);
-            if (gameToDelete == null)
+            var user = _context.Users.Where(x => x.Role == "User");
+
+            if (user != null)
             {
-                return NotFound();
+                var users = user.Select(u => new
+                {
+                    Id = u.UserId,
+                    UserName = u.UserName,
+                    Email = u.Email,
+                });
+                return Ok(users);
             }
-            _applicationDbContext.games.Remove(gameToDelete);
-            await _applicationDbContext.SaveChangesAsync();
-            return NoContent();
+            else
+            {
+                return BadRequest("No Users");
+            }
         }
+        [HttpGet]
+        [Route("GamesList"), Authorize(Roles = "Admin")]
+        public ActionResult GetGames()
+        {
+            var game = _context.Games;  
+
+            if (game != null)
+            {
+                var Games = game.Select(m => new
+                {
+                    Id = m.GameId,
+                    gameName = m.GameName,
+                    Description = m.Description,
+                    gamePrice = m.GamePrice,
+
+                });
+                return Ok(Games);
+            }
+            else
+            {
+                return BadRequest("No game");
+            }
+        }
+        [HttpPost]
+        [Route("addgame"), Authorize(Roles = "Admin")]
+        public string Addgame([FromBody] Game game)
+        {
+            try
+            {
+                var checkgame = _context.Games.SingleOrDefault(x => x.GameName == game.GameName);
+                if (checkgame == null)
+                {
+                    _context.Games.Add(game);
+                    _context.SaveChanges();
+                    return "game Added Successfully";
+                }
+                else
+                {
+                    return "game already exists !";
+                }
+            }
+            catch (Exception ex)
+            {
+                return "Exception! + " + ex;
+            }
+        }
+
+        [HttpPut]
+        [Route("updateGame/{id}"), Authorize(Roles = "Admin")]
+        public string UpdateGame([FromBody] Game game, int? id)
+        {
+            try
+            {
+                var update = _context.Games.Where(x => x.GameId == id).SingleOrDefault();
+                update.GameName = game.GameName;
+                update.Description = game.Description;
+                update.GamePrice = game.GamePrice;
+
+
+                _context.SaveChanges();
+                return "Game : " + game.GameName + " is Updated";
+            }
+            catch (Exception ex)
+            {
+                return "Error Occured " + ex;
+            }
+
+        }
+
+        [HttpDelete]
+        [Route("deleteGame/{id}"), Authorize(Roles = "Admin")]
+        public string DeleteGame(int? id)
+        {
+            try
+            {
+                var game = _context.Games.Where(e => e.GameId == id).SingleOrDefault();
+                _context.Games.Remove(game);
+                _context.SaveChanges();
+
+                return "Course with Id=" + id + " is deleted successfully";
+            }
+            catch (Exception ex)
+            {
+                return "Exception occurred: " + ex;
+            }
+        }
+
+
     }
-
-
 }
+
+

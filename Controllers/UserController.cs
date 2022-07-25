@@ -1,21 +1,47 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PS4GamingApplication.Models;
 
 namespace PS4GamingApplication.Controllers
 {
+
+    [ApiController]
     public class UserController : Controller
     {
-        private readonly ApplicationDbContext _applicationDbContext;
-        public UserController(ApplicationDbContext applicationDbContext)
+        private readonly IConfiguration _configuration;
+        private readonly ApplicationDbContext _context;
+
+        public UserController(IConfiguration configuration, ApplicationDbContext context)
         {
-            _applicationDbContext = applicationDbContext;
+            _context = context;
+            _configuration = configuration;
         }
-        [HttpPut("UpdateUser")]
-        public async Task<IActionResult> PutAsync(User userToUpdate)
+        [HttpGet]
+        [Route("ViewGamesList"), Authorize(Roles = "User")]
+        public ActionResult GetGames()
         {
-            _applicationDbContext.users.Update(userToUpdate);
-            await _applicationDbContext.SaveChangesAsync();
-            return NoContent();
+            var game= _context.Games;
+
+            if (game != null)
+            {
+                var games = game.Select(m => new
+                {
+                    Id = m.GameId,
+                    GameName = m.GameName,
+                    Description = m.Description,
+                    GamePrice=m.GamePrice
+                    
+                });
+                return Ok(games);
+            }
+            else
+            {
+                return BadRequest("No Games");
+            }
         }
+
+        
+
+       
     }
 }

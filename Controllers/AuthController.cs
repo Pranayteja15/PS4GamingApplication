@@ -1,11 +1,11 @@
 ﻿using PS4GamingApplication.Models;
-using Microsoft.AspNetCore.Authorization;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
+using bcrypt = BCrypt.Net.BCrypt;
 
 namespace PS4GamingApplication.Controllers
 {
@@ -13,109 +13,84 @@ namespace PS4GamingApplication.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        public static User user = new User();
         private readonly IConfiguration _configuration;
-        private readonly IUserService _userService;
+        private readonly ApplicationDbContext _context;
 
-        public AuthController(IConfiguration configuration, IUserService userService)
+        public AuthController(IConfiguration configuration, ApplicationDbContext context)
         {
+            _context = context;
             _configuration = configuration;
-            _userService = userService;
         }
-
-        [HttpGet, Authorize]
-        public ActionResult<string> GetMe()
+        [HttpPost]
+        [Route("login")]
+        public async Task<ActionResult<User>> Login([FromBody] Login login)
         {
-            var userName = _userService.GetMyName();
-            return Ok(userName);
-        }
-
-        [HttpPost("register")]
-        public async Task<ActionResult<User>> Register(UserDto request)
-        {
-            CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
-
-            user.Username = request.Username;
-            user.PasswordHash = passwordHash;
-            user.PasswordSalt = passwordSalt;
-
-            return Ok(user);
-        }
-
-        [HttpPost("login")]
-        public async Task<ActionResult<string>> Login(UserDto request)
-        {
-            if (user.Username != request.Username)
+            var checkEmail = await _context.Users.FirstOrDefaultAsync(x => x.Email == login.Email);
+            if (checkEmail != null)
             {
-                return BadRequest("User not found.");
+                if (bcrypt.Verify(login.Password, checkEmail.Password))
+                {
+                    var token = CreateToken(checkEmail);
+                    return Ok(token);
+                }
+                else
+                {
+                    return BadRequest("Wrong Password");
+                }
             }
-
-            if (!VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
+            else
             {
-                return BadRequest("Wrong password.");
+                return BadRequest("Invalid User");
             }
-
-            string token = CreateToken(user);
-
-            
-
-            return Ok(token);
         }
-
-        
-      
-        private RefreshToken GenerateRefreshToken()
+        [HttpPost]
+        [Route("register")]
+        public async Task<ActionResult<User>> Register([FromBody] User user)
         {
-            var refreshToken = new RefreshToken
+            var checkEmail = await _context.Users.FirstOrDefaultAsync(x => x.Email == user.Email);
+            if (checkEmail == null)
             {
-                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-                Expires = DateTime.Now.AddDays(7),
-                Created = DateTime.Now
-            };
+                if (user.Email.Contains("@gmail.com") && user.Password.Length > 8)
+                {
+                    user.Password = bcrypt.HashPassword(user.Password, 12);
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+                    return Ok("User Created Successfully");
+                }
+                else
+                {
+                    return BadRequest("Inputs does not meet requirements !");
+                }
 
-            return refreshToken;
+            }
+            else
+            {
+                return BadRequest("User already exists !");
+            }
         }
 
-     
         private string CreateToken(User user)
         {
             List<Claim> claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim("ID",user.UserId.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
             var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(
-                _configuration.GetSection("AppSettings:Token").Value));
+                _configuration.GetSection("SecretKey:Token").Value));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
 
             var token = new JwtSecurityToken(
                 claims: claims,
-                expires: DateTime.Now.AddDays(1),
+                expires: DateTime.Now.AddMinutes(10),
                 signingCredentials: creds);
 
             var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
             return jwt;
-        }
-
-        private void CreatePasswordHash(string password, out byte[] passwordHash, out byte[] passwordSalt)
-        {
-            using (var hmac = new HMACSHA512())
-            {
-                passwordSalt = hmac.Key;
-                passwordHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-            }
-        }
-
-        private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
-        {
-            using (var hmac = new HMACSHA512(passwordSalt))
-            {
-                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-                return computedHash.SequenceEqual(passwordHash);
-            }
         }
     }
 }

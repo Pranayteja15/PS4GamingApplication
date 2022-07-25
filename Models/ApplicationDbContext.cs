@@ -9,7 +9,7 @@ namespace PS4GamingApplication.Models
         {
         }
 
-        public DbSet<Game> games { get; set; }
-        public DbSet<User> users { get; set; }
+        public DbSet<Game> Games { get; set; }
+        public DbSet<User> Users { get; set; }
     }
 }

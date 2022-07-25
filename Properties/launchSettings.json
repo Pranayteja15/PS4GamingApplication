@@ -1,14 +1,6 @@
-﻿{
+{
   "$schema": "https://json.schemastore.org/launchsettings.json",
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:59592",
-      "sslPort": 44389
-    }
-  },
-  "profiles": {
+  "Users": {
     "JwtWebApiTutorial": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -26,6 +18,24 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    }
+  },
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:59592",
+      "sslPort": 44389
+    }
+  },
+  "profiles": {
+    "PS4GamingApplication": {
+      "commandName": "Project"
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "environmentVariables": {},
+      "distributionName": ""
     }
   }
 }
